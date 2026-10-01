@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>チェックリスト</title>
+<style>
+:root{--bg:#f6f7f9;--card:#fff;--text:#1d2330;--sub:#7a8394;--line:#e1e5ec;--accent:#2f6fed;--danger:#d64545;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#14171d;--card:#1d2129;--text:#e8ebf1;--sub:#8b93a5;--line:#2c323d;--accent:#6b9bff;--danger:#f07070}}
+:root[data-theme="dark"]{--bg:#14171d;--card:#1d2129;--text:#e8ebf1;--sub:#8b93a5;--line:#2c323d;--accent:#6b9bff;--danger:#f07070}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font-family:"Hiragino Sans","Noto Sans JP","Yu Gothic",system-ui,sans-serif;line-height:1.6}
+main{max-width:520px;margin:0 auto;padding:32px 16px}
+h1{font-size:1.4rem;margin:0 0 4px}
+.count{color:var(--sub);font-size:.9rem;margin:0 0 20px}
+.add{display:flex;gap:8px;margin-bottom:16px}
+input[type=text]{flex:1;min-width:0;padding:10px 12px;font:inherit;color:var(--text);background:var(--card);border:1px solid var(--line);border-radius:8px}
+button{font:inherit;cursor:pointer;border:0;border-radius:8px}
+.add button{padding:0 16px;background:var(--accent);color:#fff}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+ul{list-style:none;margin:0;padding:0;background:var(--card);border:1px solid var(--line);border-radius:8px}
+li{display:flex;align-items:center;gap:10px;padding:10px 12px;border-bottom:1px solid var(--line)}
+li:last-child{border-bottom:0}
+li input{width:18px;height:18px;accent-color:var(--accent);flex:none}
+li span{flex:1;overflow-wrap:anywhere}
+li.done span{color:var(--sub);text-decoration:line-through}
+li .del{background:none;color:var(--sub);padding:2px 8px;font-size:1.1rem}
+li .del:hover{color:var(--danger)}
+.empty{padding:20px 12px;color:var(--sub);text-align:center}
+.add .file{background:var(--card);color:var(--text);border:1px solid var(--line);padding:0 12px;white-space:nowrap}
+.hint{color:var(--sub);font-size:.8rem;margin:-8px 0 16px}
+body.dragging ul{outline:2px dashed var(--accent);outline-offset:4px}
+</style>
+</head>
+<body>
+<main>
+<h1>チェックリスト</h1>
+<p class="count" id="count"></p>
+<div class="add">
+<input type="text" id="input" placeholder="項目を入力" aria-label="新しい項目">
+<button id="addBtn">追加</button>
+<button class="file" id="fileBtn">ファイルから追加</button>
+<input type="file" id="fileInput" multiple hidden>
+</div>
+<p class="hint">ファイルをこの画面にドロップ、または複数行のテキストを貼り付けると、まとめて追加されます。</p>
+<ul id="list"></ul>
+</main>
+<script>
+let items=[];
+try{items=JSON.parse(localStorage.getItem("checklist")||"[]")}catch(e){items=[]}
+const list=document.getElementById("list"),input=document.getElementById("input"),count=document.getElementById("count");
+function save(){try{localStorage.setItem("checklist",JSON.stringify(items))}catch(e){}}
+function render(){
+list.innerHTML="";
+if(!items.length){list.innerHTML='<li class="empty">項目がありません。上の入力欄から追加してください。</li>'}
+items.forEach((it,i)=>{
+const li=document.createElement("li");if(it.done)li.className="done";
+const cb=document.createElement("input");cb.type="checkbox";cb.checked=it.done;cb.setAttribute("aria-label",it.text);
+cb.onchange=()=>{it.done=cb.checked;save();render()};
+const sp=document.createElement("span");sp.textContent=it.text;
+const del=document.createElement("button");del.className="del";del.textContent="×";del.setAttribute("aria-label","削除");
+del.onclick=()=>{items.splice(i,1);save();render()};
+li.append(cb,sp,del);list.append(li);
+});
+count.textContent=items.filter(x=>x.done).length+" / "+items.length+" 完了";
+}
+function add(){const t=input.value.trim();if(!t)return;items.push({text:t,done:false});input.value="";save();render();input.focus()}
+document.getElementById("addBtn").onclick=add;
+input.addEventListener("keydown",e=>{if(e.key==="Enter"&&!e.isComposing)add()});
+function addMany(texts){
+const ts=texts.map(t=>t.trim()).filter(Boolean);
+if(!ts.length)return;
+ts.forEach(t=>items.push({text:t,done:false}));save();render();
+}
+const fileInput=document.getElementById("fileInput");
+document.getElementById("fileBtn").onclick=()=>fileInput.click();
+fileInput.onchange=()=>{addMany([...fileInput.files].map(f=>f.name));fileInput.value=""};
+input.addEventListener("paste",e=>{
+const t=(e.clipboardData||window.clipboardData).getData("text");
+if(/\r?\n/.test(t)){e.preventDefault();addMany(t.split(/\r?\n/))}
+});
+window.addEventListener("dragover",e=>{e.preventDefault();document.body.classList.add("dragging")});
+window.addEventListener("dragleave",e=>{if(!e.relatedTarget)document.body.classList.remove("dragging")});
+window.addEventListener("drop",e=>{
+e.preventDefault();document.body.classList.remove("dragging");
+addMany([...e.dataTransfer.files].map(f=>f.name));
+});
+render();
+</script>
+</body>
+</html>
